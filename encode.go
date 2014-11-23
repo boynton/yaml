@@ -39,9 +39,20 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 		}
 		for key, val := range o {
 			s := encodeString(key, len(firstIndent))
-			switch val.(type) {
-			case map[string]interface{}, []interface{}:
-				buf.WriteString(indent + s + ":\n")
+			switch oo := val.(type) {
+			case []interface{}:
+				if len(oo) == 0 {
+					buf.WriteString(indent + s + ": ")
+				} else {
+					buf.WriteString(indent + s + ":\n")
+				}
+			case map[string]interface{}:
+				if len(oo) == 0 {
+					buf.WriteString(indent + s + ": \n")
+					continue
+				} else {
+					buf.WriteString(indent + s + ":\n")
+				}
 			default:
 				buf.WriteString(indent + s + ": ")
 			}
@@ -50,8 +61,13 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 		}
 	case []interface{}:
 		indent2 := indent + "  "
-		for _, item := range o {
-			encode(buf, item, indent2, true)
+		if len(o) == 0 {
+			buf.WriteString(firstIndent)
+			buf.WriteString("[]\n")
+		} else {
+			for _, item := range o {
+				encode(buf, item, indent2, true)
+			}
 		}
 	default:
 		typ := reflect.TypeOf(o)
@@ -78,8 +94,20 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 						s := encodeString(tag, len(firstIndent))
 						value := val.Field(i).Interface()
 						switch oo := value.(type) {
-						case map[string]interface{}, []interface{}:
-							buf.WriteString(indent + s + ":\n")
+						case []interface{}:
+							if len(oo) == 0 {
+								buf.WriteString(indent + s + ": []")
+								continue
+							} else {
+								buf.WriteString(indent + s + ":\n")
+							}
+						case map[string]interface{}:
+							if len(oo) == 0 {
+								buf.WriteString(indent + s + ": {}")
+								continue
+							} else {
+								buf.WriteString(indent + s + ":\n")
+							}
 						default:
 							typ2 := reflect.TypeOf(oo)
 							if typ2.Kind() == reflect.Ptr {
