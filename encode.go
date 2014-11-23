@@ -76,6 +76,9 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 		}
 		if typ.Kind() == reflect.Struct {
 			val := reflect.ValueOf(o)
+			if val.Kind() == reflect.Ptr{
+				val = val.Elem()
+			}
 			indent2 := indent + "    "
 			nonFirstIndent := indent
 			if inList {
