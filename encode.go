@@ -23,11 +23,53 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 		buf.WriteString(firstIndent)
 		buf.WriteString(encodeString(o, len(indent)))
 		buf.WriteString("\n")
-	case int, int32, int64:
+	case *string:
+		buf.WriteString(firstIndent)
+		buf.WriteString(encodeString(*o, len(indent)))
+		buf.WriteString("\n")
+	case bool:
+		buf.WriteString(firstIndent)
+		if o {
+			buf.WriteString("true\n")
+		} else {
+			buf.WriteString("false\n")
+		}
+	case *bool:
+		buf.WriteString(firstIndent)
+		if *o {
+			buf.WriteString("true\n")
+		} else {
+			buf.WriteString("false\n")
+		}
+	case int, int32:
+		buf.WriteString(firstIndent)
+		buf.WriteString(fmt.Sprintf("%d", o.(int)))
+		buf.WriteString("\n")
+	case *int, *int32:
+		buf.WriteString(firstIndent)
+		buf.WriteString(fmt.Sprintf("%d", *(o.(*int))))
+		buf.WriteString("\n")
+	case int64:
 		buf.WriteString(firstIndent)
 		buf.WriteString(fmt.Sprintf("%d", o))
 		buf.WriteString("\n")
-	case float32, float64:
+	case *int64:
+		buf.WriteString(firstIndent)
+		buf.WriteString(fmt.Sprintf("%d", *o))
+		buf.WriteString("\n")
+	case float32:
+		buf.WriteString(firstIndent)
+		buf.WriteString(fmt.Sprintf("%g", o))
+		buf.WriteString("\n")
+	case *float32:
+		buf.WriteString(firstIndent)
+		buf.WriteString(fmt.Sprintf("%g", *o))
+		buf.WriteString("\n")
+	case float64:
+		buf.WriteString(firstIndent)
+		buf.WriteString(fmt.Sprintf("%g", o))
+		buf.WriteString("\n")
+	case *float64:
 		buf.WriteString(firstIndent)
 		buf.WriteString(fmt.Sprintf("%g", o))
 		buf.WriteString("\n")
@@ -95,13 +137,19 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 							tag = p.Name
 							//lower case preferred, but this is whan encoding/json does
 						}
-						optional := false
+						value := val.Field(i).Interface()
 						k := strings.Index(tag, ",omitempty")
+						skip := false
 						if k > 0 {
 							tag = tag[0:k]
+							if val.Field(i).IsNil() {
+								skip = true
+							} else {
+								fmt.Println("Continuing with tag " + tag)
+							}
 						}
 						s := encodeString(tag, len(firstIndent))
-						value := val.Field(i).Interface()
+
 						switch oo := value.(type) {
 						case []interface{}:
 							if len(oo) == 0 {
@@ -122,15 +170,15 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 							if typ2.Kind() == reflect.Ptr {
 								typ2 = typ2.Elem()
 							}
-							if typ2.Kind() == reflect.Struct {
-								buf.WriteString(indent + s + ":\n")
-							} else {
-								buf.WriteString(indent + s + ": ")
+							if !skip {
+								if typ2.Kind() == reflect.Struct {
+									buf.WriteString(indent + s + ":\n")
+								} else {
+									buf.WriteString(indent + s + ": ")
+								}
 							}
 						}
-						if optional && value == nil {
-							//skip it
-						} else {
+						if !skip {
 							encode(buf, value, indent2, false)
 							indent = nonFirstIndent
 						}
@@ -138,7 +186,13 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 				}
 			}
 		} else {
-			buf.WriteString(fmt.Sprintf("Whoops: %v", o))
+			val := reflect.ValueOf(o)
+			if val.Kind() == reflect.Ptr && false {
+				val = val.Elem()
+				encode(buf, val, indent, inList)
+			} else {
+				buf.WriteString(fmt.Sprintf("Whoops: %v", o))
+			}
 		}
 	}
 }
