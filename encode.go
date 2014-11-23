@@ -3,10 +3,10 @@ package yaml
 import (
 	"bytes"
 	"fmt"
-	"strconv"
+	"reflect"
 )
 
-func Encode(obj map[string]interface{}) (string, error) {
+func Encode(obj interface{}) (string, error) {
 	var buf bytes.Buffer
 	encode(&buf, obj, "", false)
 	return buf.String(), nil
@@ -24,11 +24,11 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 		buf.WriteString("\n")
 	case int, int32, int64:
 		buf.WriteString(firstIndent)
-		buf.WriteString(strconv.FormatInt(o.(int64), 10))
+		buf.WriteString(fmt.Sprintf("%d", o))
 		buf.WriteString("\n")
 	case float32, float64:
 		buf.WriteString(firstIndent)
-		buf.WriteString(strconv.FormatFloat(o.(float64), 'g', -1, 64))
+		buf.WriteString(fmt.Sprintf("%g", o))
 		buf.WriteString("\n")
 	case map[string]interface{}:
 		indent2 := indent + "    "
@@ -54,7 +54,51 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 			encode(buf, item, indent2, true)
 		}
 	default:
-		buf.WriteString(fmt.Sprintf("Whoops: %v", o))
+		typ := reflect.TypeOf(o)
+		if typ.Kind() == reflect.Ptr{
+			typ = typ.Elem()
+		}
+		if typ.Kind() == reflect.Struct {
+			val := reflect.ValueOf(o)
+			indent2 := indent + "    "
+			nonFirstIndent := indent
+			if inList {
+				nonFirstIndent = indent[2:] + "  "
+				indent = firstIndent
+			}
+			for i := 0; i < typ.NumField(); i++ {
+				p := typ.Field(i)
+				if !p.Anonymous {
+					tag := p.Tag.Get("json")
+					if tag != "-" { //avoid those marked to ignore
+						if tag == "" {
+							tag = p.Name
+							//lower case preferred, but this is whan encoding/json does
+						}
+						s := encodeString(tag, len(firstIndent))
+						value := val.Field(i).Interface()
+						switch oo := value.(type) {
+						case map[string]interface{}, []interface{}:
+							buf.WriteString(indent + s + ":\n")
+						default:
+							typ2 := reflect.TypeOf(oo)
+							if typ2.Kind() == reflect.Ptr {
+								typ2 = typ2.Elem()
+							}
+							if typ2.Kind() == reflect.Struct {
+								buf.WriteString(indent + s + ":\n")
+							} else {
+								buf.WriteString(indent + s + ": ")
+							}
+						}
+						encode(buf, value, indent2, false)
+						indent = nonFirstIndent
+					}
+				}
+			}
+		} else {
+			buf.WriteString(fmt.Sprintf("Whoops: %v", o))
+		}
 	}
 }
 
