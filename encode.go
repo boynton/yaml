@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 func Encode(obj interface{}) (string, error) {
@@ -94,6 +95,11 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 							tag = p.Name
 							//lower case preferred, but this is whan encoding/json does
 						}
+						optional := false
+						k := strings.Index(tag, ",omitempty")
+						if k > 0 {
+							tag = tag[0:k]
+						}
 						s := encodeString(tag, len(firstIndent))
 						value := val.Field(i).Interface()
 						switch oo := value.(type) {
@@ -122,8 +128,12 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 								buf.WriteString(indent + s + ": ")
 							}
 						}
-						encode(buf, value, indent2, false)
-						indent = nonFirstIndent
+						if optional && value == nil {
+							//skip it
+						} else {
+							encode(buf, value, indent2, false)
+							indent = nonFirstIndent
+						}
 					}
 				}
 			}
