@@ -101,7 +101,6 @@ func lineIndentLevel(line string) int {
 
 func (dd *DataDecoder) decodeArray(level int) ([]interface{}, error) {
 	obj := make([]interface{}, 0)
-	//line, err := dd.getLine()
 	line, err := dd.getNonEmptyLine()
 	for err == nil {
 		eol := len(line)
@@ -238,10 +237,10 @@ func (dd *DataDecoder) decodeObject(level int) (interface{}, error) {
 				obj[key] = value
 			} else {
 				s := line[k:]
-				if "|" == s {
-					value, err = dd.decodeBlockString(lev)
+				obj[key], err = dd.decodeScalar(s, lev)
+				if err != nil {
+					return nil, err
 				}
-				obj[key] = dd.decodeScalar(s)
 			}
 
 		} else if lev < level {
@@ -259,18 +258,76 @@ func (dd *DataDecoder) decodeObject(level int) (interface{}, error) {
 	return obj, err
 }
 
-func (dd *DataDecoder) decodeScalar(s string) interface{} {
-	if s == "true" {
-		return true
+func (dd *DataDecoder) decodeScalar(s string, lev int) (interface{}, error) {
+	if "|" == s {
+		return dd.decodeBlockString(lev)
+	} else if s == "true" {
+		return true, nil
 	} else if s == "false" {
-		return false
+		return false, nil
+	} else if strings.HasPrefix(s, "[") {
+		if strings.HasSuffix(s, "]") {
+			obj := make([]interface{}, 0)
+			if "[]" == s {
+				return obj, nil
+			}
+			//a list of scalars is the only supported [ ... ] syntax, not general JSON
+			lst := strings.Split(s[1:len(s)-1],",")
+			for _, v := range lst {
+				vt := strings.Trim(v, " ")
+				o, e := dd.decodeScalar(vt, lev)
+				if e != nil { return nil, e }
+				obj = append(obj, o)
+			}
+			return obj, nil
+		} else {
+			return nil, fmt.Errorf("Malformed list: %v", s)
+		}
+	} else if strings.Index(s, "\"") >= 0 {
+		if strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"") {
+			s = s[1:len(s)-1]
+			return unescapeString(s)
+		} else {
+			return nil, fmt.Errorf("Malformed string literal: " + s)
+		}
 	} else {
 		f, err := strconv.ParseFloat(s, 64)
 		if err == nil {
-			return f
+			return f, nil
 		}
-		return s
+		//not any of the above, it is a string
+		return s, nil
 	}
+}
+
+func unescapeString(s string) (string, error) {
+	if strings.Index(s, "\\") < 0 {
+		return s, nil
+	}
+	escaped := false
+	buf := make([]byte, 0)
+	for _, c := range s {
+		if escaped {
+			switch c {
+			case '\\':
+				c = '\\'
+			case '"':
+				c = '"'
+			case 'n':
+				c = '\n'
+			case 'r':
+				c = '\r'
+			default:
+				return "", fmt.Errorf("Bad escape character in string: " + s)
+			}
+			escaped = false
+		} else if c == '\\' {
+			escaped = true
+			continue
+		}
+		buf = append(buf, byte(c))
+	}
+	return string(buf), nil
 }
 
 func (dd *DataDecoder) decodeBlockString(lev int) (*string, error) {
