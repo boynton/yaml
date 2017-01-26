@@ -41,7 +41,7 @@ func Decode(in io.Reader) (map[string]interface{}, error) {
 	case map[string]interface{}:
 		return v, nil
 	default:
-		return nil, fmt.Errorf("Unexpected return from decodeObject:", v)
+		return nil, fmt.Errorf("Unexpected return from decodeObject: %v", v)
 	}
 }
 
@@ -272,11 +272,13 @@ func (dd *DataDecoder) decodeScalar(s string, lev int) (interface{}, error) {
 				return obj, nil
 			}
 			//a list of scalars is the only supported [ ... ] syntax, not general JSON
-			lst := strings.Split(s[1:len(s)-1],",")
+			lst := strings.Split(s[1:len(s)-1], ",")
 			for _, v := range lst {
 				vt := strings.Trim(v, " ")
 				o, e := dd.decodeScalar(vt, lev)
-				if e != nil { return nil, e }
+				if e != nil {
+					return nil, e
+				}
 				obj = append(obj, o)
 			}
 			return obj, nil
@@ -285,7 +287,7 @@ func (dd *DataDecoder) decodeScalar(s string, lev int) (interface{}, error) {
 		}
 	} else if strings.Index(s, "\"") >= 0 {
 		if strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"") {
-			s = s[1:len(s)-1]
+			s = s[1 : len(s)-1]
 			return unescapeString(s)
 		} else {
 			return nil, fmt.Errorf("Malformed string literal: " + s)

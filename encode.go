@@ -71,7 +71,7 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 		buf.WriteString("\n")
 	case *float64:
 		buf.WriteString(firstIndent)
-		buf.WriteString(fmt.Sprintf("%g", o))
+		buf.WriteString(fmt.Sprintf("%g", *o))
 		buf.WriteString("\n")
 	case map[string]interface{}:
 		indent2 := indent + "    "
@@ -114,12 +114,12 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 		}
 	default:
 		typ := reflect.TypeOf(o)
-		if typ.Kind() == reflect.Ptr{
+		if typ.Kind() == reflect.Ptr {
 			typ = typ.Elem()
 		}
 		if typ.Kind() == reflect.Struct {
 			val := reflect.ValueOf(o)
-			if val.Kind() == reflect.Ptr{
+			if val.Kind() == reflect.Ptr {
 				val = val.Elem()
 			}
 			indent2 := indent + "    "
@@ -145,7 +145,9 @@ func encode(buf *bytes.Buffer, obj interface{}, indent string, inList bool) {
 							if val.Field(i).IsNil() {
 								skip = true
 							} else {
-								fmt.Println("Continuing with tag " + tag)
+								if val.Field(i).Kind() == reflect.Ptr {
+									value = val.Field(i).Elem().Interface()
+								}
 							}
 						}
 						s := encodeString(tag, len(firstIndent))
